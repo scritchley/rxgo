@@ -38,10 +38,10 @@ func WithLatestFrom(other Observable) OperatorFunc {
 					}
 				}
 			}()
-			return func() {
-				baseSub.Unsubscribe()
-				otherSub.Unsubscribe()
-			}
+			return call(
+				baseSub.Unsubscribe,
+				otherSub.Unsubscribe,
+			)
 		})
 	}
 }

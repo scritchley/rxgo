@@ -61,21 +61,22 @@ func MergeMap(fn func(v Value) Observable) OperatorFunc {
 							)
 						psub.Add(csub.Unsubscribe)
 					},
-				).OnErr(
-					func(err error) {
-						e <- err
-					},
-				).OnComplete(
-					func() {
+				).
+					OnErr(e.Error).
+					OnComplete(func() {
 						wg.Wait()
-						c <- true
-					},
-				),
+						c.Complete()
+					}),
 			)
 			psub.Add(sub.Unsubscribe)
 			return psub.Unsubscribe
 		})
 	}
+}
+
+// FlatMap is an alias of MergeMap.
+func FlatMap(fn func(v Value) Observable) OperatorFunc {
+	return MergeMap(fn)
 }
 
 func ConcatMap(fn func(v Value) Observable) OperatorFunc {
@@ -97,15 +98,19 @@ func ConcatMapTo(o Observable) OperatorFunc {
 func SwitchMap(fn func(v Value) Observable) OperatorFunc {
 	return func(o Observable) Observable {
 		return Create(func(v ValueChan, e ErrChan, c CompleteChan) TeardownFunc {
-			var sub Subscription
+			var wg sync.WaitGroup
+			next := NewSubject()
 			return o.Subscribe(
 				OnNext(func(val Value) {
-					if sub != nil {
-						sub.Unsubscribe()
-					}
-					sub = fn(val).Subscribe(OnNext(v.Next))
-				}).OnErr(e.Error).OnComplete(c.Complete),
+					wg.Add(1)
+					next.Next(nil)
+					fn(val).Pipe(TakeUntil(next)).Subscribe(OnNext(v.Next).OnErr(e.Error).OnComplete(wg.Done))
+				}).OnErr(e.Error).OnComplete(call(wg.Wait, c.Complete)),
 			).Unsubscribe
 		})
 	}
+}
+
+func SwitchMapTo(o Observable) OperatorFunc {
+	return SwitchMap(func(v Value) Observable { return o })
 }

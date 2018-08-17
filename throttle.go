@@ -2,7 +2,7 @@ package rxgo
 
 import "time"
 
-func Throttle(durationSelector func(Value)) OperatorFunc {
+func Throttle(d time.Duration, scheduler Scheduler) OperatorFunc {
 	return func(o Observable) Observable {
 		return Create(func(v ValueChan, e ErrChan, c CompleteChan) TeardownFunc {
 			debounce := make(chan Value)
@@ -11,7 +11,7 @@ func Throttle(durationSelector func(Value)) OperatorFunc {
 			LOOP:
 				for {
 					val := <-debounce
-					durationSelector(val)
+					scheduler.Schedule(func() {}, d)
 					v <- val
 					select {
 					case <-done:
@@ -34,7 +34,5 @@ func Throttle(durationSelector func(Value)) OperatorFunc {
 }
 
 func ThrottleTime(d time.Duration) OperatorFunc {
-	return Throttle(func(Value) {
-		time.Sleep(d)
-	})
+	return Throttle(d, DefaultAsyncScheduler)
 }

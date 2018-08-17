@@ -91,22 +91,22 @@ type chanObserver struct {
 
 func NewChanObserver() chanObserver {
 	return chanObserver{
-		make(ValueChan),
+		make(ValueChan, 1),
 		make(ErrChan, 1),
 		make(CompleteChan, 1),
 	}
 }
 
 func (c chanObserver) Next(v Value) {
-	c.ValueChan <- v
+	c.ValueChan.Next(v)
 }
 
 func (c chanObserver) Err(err error) {
-	c.ErrChan <- err
+	c.ErrChan.Error(err)
 }
 
 func (c chanObserver) Complete() {
-	c.CompleteChan <- true
+	c.CompleteChan.Complete()
 }
 
 func (co chanObserver) From() Observable {

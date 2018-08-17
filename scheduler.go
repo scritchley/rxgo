@@ -1,32 +1,60 @@
 package rxgo
 
-import "time"
+import (
+	"sync"
+	"time"
+)
+
+var (
+	DefaultAsyncScheduler Scheduler = AsyncScheduler{}
+)
 
 type Scheduler interface {
-	Schedule(func())
-	Stop()
+	Now() time.Time
+	Schedule(work func(), delay time.Duration)
 }
 
-type TickerScheduler struct {
-	*time.Ticker
+type AsyncScheduler struct {
 }
 
-func (t TickerScheduler) Schedule(fn func() bool) {
-	go func() {
-		for range t.C {
-			if !fn() {
-				t.Stop()
-			}
-		}
-	}()
+func (s AsyncScheduler) Now() time.Time {
+	return time.Now()
 }
 
-func (t TickerScheduler) Stop() {
-	t.Stop()
+func (s AsyncScheduler) Schedule(work func(), delay time.Duration) {
+	<-time.After(delay)
+	work()
 }
 
-func NewTickerScheduler(d time.Duration) TickerScheduler {
-	return TickerScheduler{
-		Ticker: time.NewTicker(d),
-	}
+type ASAPScheduler struct{}
+
+func (s ASAPScheduler) Now() time.Time {
+	return time.Now()
+}
+
+func (s ASAPScheduler) Schedule(work func(), delay time.Duration) {
+	work()
+}
+
+type MockTimeBasedScheduler struct {
+	mtx  sync.RWMutex
+	base int64
+	time.Duration
+}
+
+func NewMockTimeBasedScheduler() *MockTimeBasedScheduler {
+	return &MockTimeBasedScheduler{base: time.Now().UnixNano()}
+}
+
+func (s *MockTimeBasedScheduler) Now() time.Time {
+	// s.mtx.Lock()
+	// defer s.mtx.Unlock()
+	return time.Unix(0, s.base).Add(s.Duration)
+}
+
+func (s *MockTimeBasedScheduler) Schedule(work func(), delay time.Duration) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	s.Duration += delay
+	work()
 }

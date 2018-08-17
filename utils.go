@@ -21,3 +21,11 @@ func Finalize(finalize func()) OperatorFunc {
 		})
 	}
 }
+
+func call(fns ...func()) func() {
+	return func() {
+		for _, fn := range fns {
+			fn()
+		}
+	}
+}

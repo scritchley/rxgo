@@ -8,10 +8,10 @@ import (
 	"time"
 )
 
-func Print(resolution time.Duration) OperatorFunc {
+func Print(scheduler Scheduler, resolution time.Duration) OperatorFunc {
 	return func(obs Observable) Observable {
 		return Create(func(v ValueChan, e ErrChan, c CompleteChan) TeardownFunc {
-			printer := NewPrinter(resolution).Start()
+			printer := NewPrinter(scheduler, resolution)
 			return obs.Subscribe(OnNext(printer.Next).
 				OnErr(func(err error) {
 					printer.Err(err)
@@ -28,19 +28,15 @@ func Print(resolution time.Duration) OperatorFunc {
 }
 
 type Printer struct {
-	mtx            sync.Mutex
+	scheduler      Scheduler
 	lastUpdateTime time.Time
+	mtx            sync.Mutex
 	bytes.Buffer
 	resolution time.Duration
 }
 
-func NewPrinter(resolution time.Duration) *Printer {
-	return &Printer{resolution: resolution}
-}
-
-func (p *Printer) Start() *Printer {
-	p.lastUpdateTime = time.Now()
-	return p
+func NewPrinter(scheduler Scheduler, resolution time.Duration) *Printer {
+	return &Printer{scheduler: scheduler, resolution: resolution}
 }
 
 func (p *Printer) Next(v Value) {
@@ -66,7 +62,7 @@ func (p *Printer) Complete() {
 
 func (p *Printer) addTicks() {
 	if !p.lastUpdateTime.IsZero() {
-		since := time.Since(p.lastUpdateTime)
+		since := p.scheduler.Now().Sub(p.lastUpdateTime)
 		millis := math.Round(float64(since.Nanoseconds() / p.resolution.Nanoseconds()))
 		for i := 0; i < int(millis); i++ {
 			p.Buffer.WriteString("-")

@@ -21,8 +21,8 @@ func Take(num int) OperatorFunc {
 func TakeUntil(observable Observable) OperatorFunc {
 	return func(o Observable) Observable {
 		return Create(func(v ValueChan, e ErrChan, c CompleteChan) TeardownFunc {
-			sub := o.Subscribe(OnNext(func(val Value) { v <- val }).OnErr(e.Error).OnComplete(c.Complete))
-			observable.Subscribe(OnNext(func(val Value) { c <- true }).OnErr(func(e error) { c <- true }).OnComplete(func() { c <- true }))
+			sub := o.Subscribe(OnNext(v.Next).OnErr(e.Error).OnComplete(c.Complete))
+			observable.Subscribe(OnNext(func(Value) { c.Complete() }).OnErr(e.Error).OnComplete(c.Complete))
 			return sub.Unsubscribe
 		})
 	}

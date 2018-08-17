@@ -13,7 +13,7 @@ func Create(subscriber Subscriber) BaseObservable {
 func (c BaseObservable) Subscribe(obs Observer) Subscription {
 	valueCh := make(ValueChan)
 	errCh := make(ErrChan, 1)
-	completeCh := make(CompleteChan)
+	completeCh := make(CompleteChan, 1)
 	td := c.Subscriber(valueCh, errCh, completeCh)
 	sub := NewSubscription(td)
 	go func() {
@@ -84,7 +84,10 @@ func (e ErrChan) Error(err error) {
 type CompleteChan chan bool
 
 func (c CompleteChan) Complete() {
-	close(c)
+	select {
+	case c <- true:
+	default:
+	}
 }
 
 type NextObserver interface {
@@ -121,14 +124,12 @@ func Pipe(fns ...OperatorFunc) OperatorFunc {
 func Range(start, end int) Observable {
 	return Create(func(v ValueChan, e ErrChan, c CompleteChan) TeardownFunc {
 		go func() {
-			for i := start; i < end; i++ {
+			for i := start; i <= end; i++ {
 				v <- i
 			}
 			c <- true
 		}()
-		return func() {
-			c.Complete()
-		}
+		return c.Complete
 	})
 }
 
@@ -140,6 +141,6 @@ func Of(values ...Value) Observable {
 			}
 			c.Complete()
 		}()
-		return func() {}
+		return nil
 	})
 }
