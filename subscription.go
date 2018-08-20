@@ -20,7 +20,7 @@ type subscription struct {
 }
 
 func NewSubscription(teardown TeardownFunc) *subscription {
-	return &subscription{TeardownFunc: teardown, done: make(chan bool)}
+	return &subscription{TeardownFunc: teardown, done: make(chan bool, 1)}
 }
 
 func (s *subscription) Unsubscribe() {

@@ -1,11 +1,11 @@
 package rxgo
 
 import (
+	"errors"
+	"reflect"
 	"testing"
 	"time"
 )
-
-var tenMilliseconds = 10 * time.Millisecond
 
 var testCases = []struct {
 	name string
@@ -34,6 +34,17 @@ var testCases = []struct {
 			),
 	},
 	{
+		"Merge should merge the output of the provided observables",
+		Merge(
+			Of(1),
+			Of(1),
+			Of(1),
+		).
+			Pipe(
+				Assert(1, 1, 1),
+			),
+	},
+	{
 		"Pipe should pipe via the provided operators",
 		Of(1, 2, 3).
 			Pipe(
@@ -43,12 +54,28 @@ var testCases = []struct {
 			),
 	},
 	{
+		"ToArray should append all emitted values to slice and emit once",
+		Of(1, 2, 3).
+			Pipe(
+				ToArray(),
+				Assert([]Value{1, 2, 3}),
+			),
+	},
+	{
+		"Last should emit the last value",
+		Of(1, 2, 3).
+			Pipe(
+				Last(),
+				Assert(3),
+			),
+	},
+	{
 		"Reduce should apply reduce func to values",
 		Range(0, 5).
 			Pipe(
 				Reduce(func(acc, value Value) Value {
 					return acc.(int) + value.(int)
-				}),
+				}, nil),
 				Assert(15),
 			),
 	},
@@ -84,7 +111,9 @@ var testCases = []struct {
 		"ConcatMapTo should subscribe to the provided observable",
 		Of(1, 2, 3).
 			Pipe(
-				ConcatMapTo(Of(1, 2, 3)),
+				ConcatMapTo(
+					Of(1, 2, 3),
+				),
 				Assert(1, 2, 3, 1, 2, 3, 1, 2, 3),
 			),
 	},
@@ -95,7 +124,9 @@ var testCases = []struct {
 		Of(300, 200, 100).
 			Pipe(
 				MergeMap(func(value Value) Observable {
-					return Of(value).Pipe(Delay(time.Duration(value.(int)) * time.Millisecond))
+					return Of(value).Pipe(
+						Delay(time.Duration(value.(int)) * time.Millisecond),
+					)
 				}),
 				Assert(100, 200, 300),
 			),
@@ -137,10 +168,120 @@ var testCases = []struct {
 	},
 	{
 		"TakeUntil should take values until the provided Observable emits",
-		Interval(40*time.Millisecond).Pipe(
-			TakeUntil(Interval(100*time.Millisecond)),
-			Assert(0, 1),
+		Interval(40*time.Millisecond).
+			Pipe(
+				TakeUntil(
+					Interval(100*time.Millisecond),
+				),
+				Assert(0, 1),
+			),
+	},
+	{
+		"ForkJoin should return an array containing the results in order",
+		ForkJoin(
+			Of(0, 1),
+			Of(0, 2),
+			Of(0, 3),
+			Of(0, 4),
+		).Pipe(
+			Assert([]Value{1, 2, 3, 4}),
 		),
+	},
+	{
+		"GroupBy should return an array containing",
+		Of(1, 1, 1).
+			Pipe(
+				GroupBy(func(v Value) Value {
+					return v
+				},
+					ToArray(),
+				),
+			).
+			Pipe(
+				Assert([]Value{1, 1, 1}),
+			),
+	},
+	{
+		"Share should share source between multiple subscribers",
+		Of(1, 2, 3).
+			Pipe(
+				Share(),
+				Assert(1, 2, 3),
+			),
+	},
+	{
+		"IgnoreElements should ignore all elements",
+		Of(1, 2, 3).
+			Pipe(
+				IgnoreElements(),
+				Assert(),
+			),
+	},
+	{
+		"DistinctUntilChanged should only emit when the current value is different than the last.",
+		Of(1, 1, 2, 2, 3, 4, 5, 5).
+			Pipe(
+				DistinctUntilChanged(DeepEqual),
+				Assert(1, 2, 3, 4, 5),
+			),
+	},
+	{
+		"Catch should catch an error",
+		Of(1).
+			Pipe(
+				ConcatMap(func(val Value) Observable {
+					return Throw(errors.New("err"))
+				}),
+				Catch(func(e error) (Value, error) {
+					if reflect.DeepEqual(e, errors.New("err")) {
+						return e, nil
+					}
+					return nil, e
+				}),
+				Assert(errors.New("err")),
+			),
+	},
+	{
+		"Retry should retry the observable on receiving an error",
+		Of(1, 2, 3).
+			Pipe(
+				ConcatMap(func(val Value) Observable {
+					if val.(int) > 2 {
+						return Throw(errors.New("err"))
+					}
+					return Of(val)
+				}),
+				Retry(2),
+				Catch(func(e error) (Value, error) {
+					if reflect.DeepEqual(e, errors.New("err")) {
+						return e, nil
+					}
+					return nil, e
+				}),
+				Assert(1, 2, 1, 2, 1, 2, errors.New("err")),
+			),
+	},
+	{
+		"ExhaustMap should map to inner observable, ignore other values until that observable completes.",
+		Interval(time.Millisecond).
+			Pipe(
+				Take(2),
+				ExhaustMap(func(val Value) Observable {
+					return Of(1, 2, 3).Pipe(
+						Delay(10 * time.Millisecond),
+					)
+				}),
+				Assert(1, 2, 3),
+			),
+	},
+	{
+		"Timeout should timeout if the observable does not emit within the provided timeout duration.",
+		Interval(time.Second).
+			Pipe(
+				Take(3),
+				Timeout(time.Millisecond),
+				Assert(),
+			),
 	},
 }
 

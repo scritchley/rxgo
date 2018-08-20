@@ -82,10 +82,15 @@ func FlatMap(fn func(v Value) Observable) OperatorFunc {
 func ConcatMap(fn func(v Value) Observable) OperatorFunc {
 	return func(o Observable) Observable {
 		return Create(func(v ValueChan, e ErrChan, c CompleteChan) TeardownFunc {
+			var wg sync.WaitGroup
 			return o.Subscribe(
 				OnNext(func(val Value) {
-					fn(val).Subscribe(OnNext(v.Next).OnErr(e.Error)).Wait()
-				}).OnErr(e.Error).OnComplete(c.Complete),
+					wg.Add(1)
+					fn(val).Subscribe(OnNext(v.Next).OnErr(e.Error).OnComplete(wg.Done)).Wait()
+				}).OnErr(e.Error).OnComplete(func() {
+					wg.Wait()
+					c.Complete()
+				}),
 			).Unsubscribe
 		})
 	}
@@ -113,4 +118,29 @@ func SwitchMap(fn func(v Value) Observable) OperatorFunc {
 
 func SwitchMapTo(o Observable) OperatorFunc {
 	return SwitchMap(func(v Value) Observable { return o })
+}
+
+func ExhaustMap(fn func(v Value) Observable) OperatorFunc {
+	return func(o Observable) Observable {
+		sem := make(chan bool, 1)
+		return Create(func(v ValueChan, e ErrChan, c CompleteChan) TeardownFunc {
+			var wg sync.WaitGroup
+			return o.Subscribe(
+				OnNext(func(val Value) {
+					select {
+					case sem <- true:
+						wg.Add(1)
+						fn(val).Subscribe(OnNext(v.Next).OnErr(e.Error).OnComplete(func() {
+							<-sem
+							wg.Done()
+						}))
+					default:
+					}
+				}).OnErr(e.Error).OnComplete(func() {
+					wg.Wait()
+					c.Complete()
+				}),
+			).Unsubscribe
+		})
+	}
 }

@@ -1,16 +1,16 @@
 package rxgo
 
-type BaseObservable struct {
+type observable struct {
 	Subscriber
 }
 
-func Create(subscriber Subscriber) BaseObservable {
-	return BaseObservable{
+func Create(subscriber Subscriber) Observable {
+	return observable{
 		subscriber,
 	}
 }
 
-func (c BaseObservable) Subscribe(obs Observer) Subscription {
+func (c observable) Subscribe(obs Observer) Subscription {
 	valueCh := make(ValueChan)
 	errCh := make(ErrChan, 1)
 	completeCh := make(CompleteChan, 1)
@@ -35,7 +35,7 @@ func (c BaseObservable) Subscribe(obs Observer) Subscription {
 	return sub
 }
 
-func (c BaseObservable) Pipe(ops ...OperatorFunc) Observable {
+func (c observable) Pipe(ops ...OperatorFunc) Observable {
 	return Pipe(ops...)(c)
 }
 
@@ -55,6 +55,16 @@ func (c cancellableObserver) Cancel() {
 type Observable interface {
 	Subscribable
 	Pipeable
+}
+
+type Observables []Observable
+
+func (o Observables) Map(fn func(Observable) Observable) Observables {
+	mapped := make([]Observable, len(o))
+	for i, observable := range o {
+		mapped[i] = fn(observable)
+	}
+	return mapped
 }
 
 type Subscribable interface {
