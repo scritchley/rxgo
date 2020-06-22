@@ -1,5 +1,7 @@
 package rxgo
 
+type ObserverFn func(v ValueChan, e ErrChan, c CompleteChan) error
+
 type observer struct {
 	ValueChan
 	ErrChan

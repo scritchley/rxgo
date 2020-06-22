@@ -17,20 +17,26 @@ func (c observable) Subscribe(obs Observer) Subscription {
 	td := c.Subscriber(valueCh, errCh, completeCh)
 	sub := NewSubscription(td)
 	go func() {
+		defer sub.Unsubscribe()
 	LOOP:
 		for {
 			select {
 			case v := <-valueCh:
-				obs.Next(v)
+				if obs != nil {
+					obs.Next(v)
+				}
 			case e := <-errCh:
-				obs.Err(e)
+				if obs != nil {
+					obs.Err(e)
+				}
 				break LOOP
 			case <-completeCh:
-				obs.Complete()
+				if obs != nil {
+					obs.Complete()
+				}
 				break LOOP
 			}
 		}
-		sub.Unsubscribe()
 	}()
 	return sub
 }
@@ -76,8 +82,6 @@ type Observer interface {
 	ErrObserver
 	CompletionObserver
 }
-
-type Value interface{}
 
 type ValueChan chan Value
 
@@ -154,3 +158,11 @@ func Of(values ...Value) Observable {
 		return nil
 	})
 }
+
+type noOpObserver struct{}
+
+func (noOpObserver) Next(Value) {}
+
+func (noOpObserver) Err(error) {}
+
+func (noOpObserver) Complete() {}

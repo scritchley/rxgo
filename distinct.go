@@ -1,6 +1,9 @@
 package rxgo
 
-import "reflect"
+import (
+	"fmt"
+	"reflect"
+)
 
 func DistinctUntilChanged(compare func(a, b Value) bool) OperatorFunc {
 	var prevVal Value
@@ -17,6 +20,22 @@ func DistinctUntilChanged(compare func(a, b Value) bool) OperatorFunc {
 	}
 }
 
+func Distinct(keyFn func(v Value) string) OperatorFunc {
+	distinctMap := make(map[string]struct{})
+	return Filter(func(val Value) bool {
+		key := keyFn(val)
+		if _, ok := distinctMap[key]; !ok {
+			distinctMap[key] = struct{}{}
+			return true
+		}
+		return false
+	})
+}
+
 func DeepEqual(a, b Value) bool {
 	return reflect.DeepEqual(a, b)
+}
+
+func Sprint(a Value) string {
+	return fmt.Sprint(a)
 }

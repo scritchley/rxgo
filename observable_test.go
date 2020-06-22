@@ -70,13 +70,23 @@ var testCases = []struct {
 			),
 	},
 	{
-		"Reduce should apply reduce func to values",
+		"Reduce should apply accumulator func to values",
 		Range(0, 5).
 			Pipe(
 				Reduce(func(acc, value Value) Value {
 					return acc.(int) + value.(int)
 				}, nil),
 				Assert(15),
+			),
+	},
+	{
+		"Scan should apply accumulator func to values and emit on each",
+		Range(0, 5).
+			Pipe(
+				Scan(func(acc, value Value) Value {
+					return acc.(int) + value.(int)
+				}, nil),
+				Assert(1, 3, 6, 10, 15),
 			),
 	},
 	{
@@ -177,6 +187,22 @@ var testCases = []struct {
 			),
 	},
 	{
+		"TakeWhile should take values until the provided fn returns false (inclusive)",
+		Range(1, 5).
+			Pipe(
+				TakeWhile(func(v Value) bool { return v.(int) < 3 }, true),
+				Assert(1, 2, 3),
+			),
+	},
+	{
+		"TakeWhile should take values until the provided fn returns false (exclusive)",
+		Range(1, 5).
+			Pipe(
+				TakeWhile(func(v Value) bool { return v.(int) < 3 }, false),
+				Assert(1, 2),
+			),
+	},
+	{
 		"ForkJoin should return an array containing the results in order",
 		ForkJoin(
 			Of(0, 1),
@@ -223,6 +249,14 @@ var testCases = []struct {
 			Pipe(
 				DistinctUntilChanged(DeepEqual),
 				Assert(1, 2, 3, 4, 5),
+			),
+	},
+	{
+		"Distinct should emit only the distinct items",
+		Of(1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 6).
+			Pipe(
+				Distinct(Sprint),
+				Assert(1, 2, 3, 4, 5, 6),
 			),
 	},
 	{

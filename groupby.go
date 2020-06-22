@@ -1,6 +1,7 @@
 package rxgo
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -8,11 +9,11 @@ func GroupBy(fn func(v Value) Value, apply ...OperatorFunc) OperatorFunc {
 	return func(o Observable) Observable {
 		return Create(func(v ValueChan, e ErrChan, c CompleteChan) TeardownFunc {
 			var wg sync.WaitGroup
-			groups := make(map[Value]Subject)
+			groups := make(map[string]Subject)
 			return o.Subscribe(
 				OnNext(
 					func(val Value) {
-						key := fn(val)
+						key := fmt.Sprint(fn(val))
 						if group, ok := groups[key]; ok {
 							group.Next(val)
 						} else {

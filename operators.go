@@ -68,12 +68,12 @@ func BufferWithCount(num, count int) OperatorFunc {
 	}
 }
 
-// ToSlice is an alias of ToArray with a more Go-friendly name.
-func ToSlice() OperatorFunc {
-	return ToArray()
+// ToArray is an alias of ToSlice.
+func ToArray() OperatorFunc {
+	return ToSlice()
 }
 
-func ToArray() OperatorFunc {
+func ToSlice() OperatorFunc {
 	return func(o Observable) Observable {
 		return o.Pipe(
 			Reduce(func(acc, val Value) Value {
